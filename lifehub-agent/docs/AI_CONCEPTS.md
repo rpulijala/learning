@@ -14,7 +14,8 @@ A beginner-friendly guide to the AI concepts used in LifeHub Agent.
 6. [LangGraph](#6-langgraph)
 7. [Multi-Agent Architecture](#7-multi-agent-architecture)
 8. [Streaming (SSE)](#8-streaming-sse)
-9. [Putting It All Together](#9-putting-it-all-together)
+9. [MCP (Model Context Protocol)](#9-mcp-model-context-protocol)
+10. [Putting It All Together](#10-putting-it-all-together)
 
 ---
 
@@ -449,7 +450,163 @@ while (true) {
 
 ---
 
-## 9. Putting It All Together
+## 9. MCP (Model Context Protocol)
+
+### What is it?
+MCP is an open protocol that lets AI applications connect to external tools and data sources in a standardized way. Think of it as a "USB for AI" - any MCP-compatible tool can plug into any MCP-compatible AI app.
+
+### ELI5
+Imagine every AI assistant speaks a different language. MCP is like a universal translator - it lets your AI talk to any tool (web search, databases, file systems) without writing custom code for each one.
+
+### The Problem MCP Solves
+```
+Without MCP:
+┌─────────────────────────────────────────────────────────────────┐
+│  Your AI App                                                     │
+│  ├── Custom code for Google Search API                          │
+│  ├── Custom code for GitHub API                                 │
+│  ├── Custom code for Slack API                                  │
+│  └── Custom code for every new tool...  😫                      │
+└─────────────────────────────────────────────────────────────────┘
+
+With MCP:
+┌─────────────────────────────────────────────────────────────────┐
+│  Your AI App (MCP Client)                                        │
+│  └── One MCP client that connects to ANY MCP server             │
+└─────────────────────────────────────────────────────────────────┘
+         │              │              │
+         ▼              ▼              ▼
+    ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │ Search  │   │ GitHub  │   │  Slack  │
+    │ Server  │   │ Server  │   │ Server  │
+    └─────────┘   └─────────┘   └─────────┘
+```
+
+### How MCP Works
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    MCP Architecture                              │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐         ┌──────────────┐                      │
+│  │  MCP Client  │ ◄─────► │  MCP Server  │                      │
+│  │  (Your App)  │  JSON   │  (External)  │                      │
+│  └──────────────┘         └──────────────┘                      │
+│                                                                  │
+│  Client actions:           Server provides:                      │
+│  • list_tools()            • Tool definitions                   │
+│  • call_tool(name, args)   • Tool execution                     │
+│  • list_resources()        • Data resources                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### MCP vs Regular APIs
+
+| Aspect | Regular API | MCP |
+|--------|-------------|-----|
+| Discovery | Read docs, write code | `list_tools()` returns schema |
+| Integration | Custom per API | One client for all servers |
+| Schema | Varies wildly | Standardized JSON Schema |
+| AI-friendly | Not designed for LLMs | Built for AI tool calling |
+
+### In LifeHub Agent
+
+We use MCP as a **client** to connect to external MCP servers like Brave Search:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    LifeHub Agent                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              Built-in Tools                              │    │
+│  │  • get_weather    • add_task    • search_notes          │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              +                                   │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │              MCP Client                                  │    │
+│  │  Dynamically loads tools from MCP servers                │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                              │                                   │
+└──────────────────────────────┼───────────────────────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────┐
+                    │  Brave Search    │
+                    │  MCP Server      │
+                    │  ────────────    │
+                    │  • brave_web_search
+                    │  • brave_news_search
+                    │  • brave_image_search
+                    │  • brave_video_search
+                    └──────────────────┘
+```
+
+### How LifeHub Integrates MCP
+
+**1. On Startup** - Load tools from configured MCP servers:
+```python
+# backend/mcp/client.py
+async with stdio_client(server_params) as (read, write):
+    async with ClientSession(read, write) as session:
+        await session.initialize()
+        tools = await session.list_tools()  # Get available tools
+```
+
+**2. Convert to LangChain** - Wrap MCP tools for our agent:
+```python
+# MCP tool schema → LangChain StructuredTool
+StructuredTool.from_function(
+    func=sync_call_mcp_tool,
+    name="brave_web_search",
+    description="Search the web...",
+    args_schema=BraveWebSearchArgs,  # Built from MCP schema
+)
+```
+
+**3. Agent Uses Them** - Planner can now include MCP tools in plans:
+```json
+{
+  "plan": [
+    {"step": 1, "tool": "brave_web_search", "tool_input": {"query": "Python 3.13 features"}},
+    {"step": 2, "tool": null, "description": "Summarize results"}
+  ]
+}
+```
+
+### Code Structure
+```
+backend/mcp/
+├── __init__.py      # Package exports
+├── config.py        # Server configurations (which MCP servers to connect to)
+└── client.py        # MCP client wrapper (connects, lists tools, calls tools)
+```
+
+### Configuration
+MCP servers are enabled via environment variables:
+```bash
+# Enable Brave Search MCP
+export BRAVE_API_KEY="your-api-key"
+
+# On startup, LifeHub will:
+# 1. Detect BRAVE_API_KEY is set
+# 2. Connect to Brave Search MCP server
+# 3. Load 6 tools (web_search, news_search, etc.)
+# 4. Make them available to the agent
+```
+
+### Available MCP Servers
+| Server | What it provides | API Key? |
+|--------|------------------|----------|
+| **Brave Search** | Web, news, image, video search | Yes (free tier) |
+| **GitHub** | Repos, issues, PRs | Yes |
+| **Filesystem** | Read/write local files | No |
+| **Postgres** | Database queries | No |
+
+---
+
+## 10. Putting It All Together
 
 ### Complete Request Flow
 
@@ -533,6 +690,7 @@ User: "Based on my notes, what's my running plan? Also add a task to buy shoes."
 | **LangGraph** | Flowchart framework for LLM apps |
 | **Multi-Agent** | Specialized LLMs working together |
 | **Streaming** | Real-time token-by-token delivery |
+| **MCP** | Universal protocol for AI tool integration |
 
 ---
 
@@ -542,3 +700,6 @@ User: "Based on my notes, what's my running plan? Also add a task to buy shoes."
 - [ChromaDB Documentation](https://docs.trychroma.com/)
 - [OpenAI Embeddings Guide](https://platform.openai.com/docs/guides/embeddings)
 - [RAG Explained (LangChain)](https://python.langchain.com/docs/tutorials/rag/)
+- [MCP Protocol Specification](https://modelcontextprotocol.io/)
+- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
+- [Brave Search MCP Server](https://github.com/brave/brave-search-mcp-server)

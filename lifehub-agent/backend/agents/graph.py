@@ -12,13 +12,15 @@ from backend.models import get_model_client
 from backend.tools.weather import get_weather
 from backend.tools.tasks import add_task
 from backend.tools.notes import search_notes
+from backend.mcp.config import is_mcp_enabled
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Define the tools available to the worker
-TOOLS = [get_weather, add_task, search_notes]
+# Define the base tools available to the worker
+BASE_TOOLS = [get_weather, add_task, search_notes]
+TOOLS = list(BASE_TOOLS)  # Will be extended with MCP tools
 TOOL_MAP = {tool.name: tool for tool in TOOLS}
 
 
@@ -47,25 +49,41 @@ class MultiAgentState(TypedDict):
 
 
 # System prompts for each agent
-PLANNER_SYSTEM_PROMPT = """You are a planning agent for LifeHub. Your job is to analyze the user's request and create a structured execution plan.
-
-Available tools:
-- get_weather(city: str): Get weather information for a city
-- add_task(task: str): Add a task to the user's task list
-- search_notes(query: str): Search the user's personal notes (fitness plans, recipes, etc.)
-
-Analyze the user's message and output a JSON plan with this exact format:
-{
+def get_planner_system_prompt(tools: list) -> str:
+    """Generate planner system prompt with available tools."""
+    tool_descriptions = []
+    for tool in tools:
+        # Get tool name and description
+        name = tool.name
+        desc = tool.description if hasattr(tool, 'description') else f"Tool: {name}"
+        # Truncate long descriptions
+        if len(desc) > 200:
+            desc = desc[:200] + "..."
+        tool_descriptions.append(f"- {name}: {desc}")
+    
+    tools_list = "\n".join(tool_descriptions)
+    
+    json_example = '''{
   "plan": [
     {"step": 1, "description": "Brief description of what to do", "tool": "tool_name or null", "tool_input": {"param": "value"} or null},
     {"step": 2, "description": "...", "tool": "...", "tool_input": {...}}
   ]
-}
+}'''
+    
+    return f"""You are a planning agent for LifeHub. Your job is to analyze the user's request and create a structured execution plan.
+
+Available tools:
+{tools_list}
+
+Analyze the user's message and output a JSON plan with this exact format:
+{json_example}
 
 Guidelines:
 - If the user asks about their notes, fitness, recipes, or personal information, use search_notes
 - If the user asks about weather, use get_weather
 - If the user wants to add/create a task or reminder, use add_task
+- If the user wants to search the web for current information, use brave_web_search with query parameter
+- Do NOT use brave_summarizer - it requires a special key from prior searches
 - You can have multiple steps that use different tools
 - Steps without tools are for reasoning/synthesis (set tool to null)
 - Always end with a synthesis step (tool: null) to combine results
@@ -94,17 +112,29 @@ Your response should:
 Be helpful, concise, and natural. Do not output JSON or technical details."""
 
 
-def create_multi_agent_graph(provider: str = "openai"):
+def create_multi_agent_graph(provider: str = "openai", mcp_tools: list | None = None):
     """Create and compile the multi-agent LangGraph graph.
     
     Args:
         provider: Model provider to use ("openai" or "ollama")
+        mcp_tools: Optional list of MCP tools to include
     """
+    # Combine base tools with MCP tools
+    all_tools = list(BASE_TOOLS)
+    if mcp_tools:
+        all_tools.extend(mcp_tools)
+        logger.info(f"Added {len(mcp_tools)} MCP tools: {[t.name for t in mcp_tools]}")
+    
+    tool_map = {tool.name: tool for tool in all_tools}
+    
     # Get model clients for each agent role
     planner_model = get_model_client(provider=provider, streaming=False, temperature=0.3)
     worker_model = get_model_client(provider=provider, streaming=False, temperature=0.2)
-    worker_model_with_tools = worker_model.bind_tools(TOOLS)
+    worker_model_with_tools = worker_model.bind_tools(all_tools)
     explainer_model = get_model_client(provider=provider, streaming=True, temperature=0.7)
+    
+    # Generate planner prompt with all available tools
+    planner_system_prompt = get_planner_system_prompt(all_tools)
     
     def planner_node(state: MultiAgentState) -> dict:
         """Planner agent: analyzes request and creates execution plan."""
@@ -114,7 +144,7 @@ def create_multi_agent_graph(provider: str = "openai"):
         
         # Build planner prompt
         planner_messages = [
-            SystemMessage(content=PLANNER_SYSTEM_PROMPT),
+            SystemMessage(content=planner_system_prompt),
             HumanMessage(content=f"User request: {messages[-1].content if messages else 'No message'}")
         ]
         
@@ -175,10 +205,10 @@ def create_multi_agent_graph(provider: str = "openai"):
             
             logger.info(f"Executing step {step_num}: {description}")
             
-            if tool_name and tool_name in TOOL_MAP:
+            if tool_name and tool_name in tool_map:
                 # Directly invoke the tool
                 try:
-                    tool = TOOL_MAP[tool_name]
+                    tool = tool_map[tool_name]
                     result = tool.invoke(tool_input)
                     
                     # Convert result to string

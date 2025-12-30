@@ -111,8 +111,8 @@
         <mxCell id="tools-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f3ff;strokeColor=#0066CC;" vertex="1" parent="1">
           <mxGeometry x="360" y="390" width="380" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="tools-title" value="Tools" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
-          <mxGeometry x="370" y="395" width="60" height="20" as="geometry" />
+        <mxCell id="tools-title" value="Built-in Tools" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="370" y="395" width="100" height="20" as="geometry" />
         </mxCell>
         <mxCell id="tool-weather" value="get_weather&#xa;(Open-Meteo)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="380" y="420" width="100" height="40" as="geometry" />
@@ -122,6 +122,34 @@
         </mxCell>
         <mxCell id="tool-notes" value="search_notes&#xa;(RAG)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
           <mxGeometry x="620" y="420" width="100" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- MCP Client Box -->
+        <mxCell id="mcp-box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="720" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp-title" value="MCP Client (Model Context Protocol)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="625" width="250" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp-desc" value="Dynamically loads tools from external MCP servers" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="50" y="645" width="280" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp-brave" value="Brave Search&#xa;MCP Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="360" y="650" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp-tools" value="brave_web_search&#xa;brave_news_search&#xa;brave_image_search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9" vertex="1" parent="1">
+          <mxGeometry x="500" y="645" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mcp-more" value="+ More servers&#xa;(GitHub, etc.)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=9;dashed=1" vertex="1" parent="1">
+          <mxGeometry x="640" y="650" width="100" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- MCP Arrow from Tools -->
+        <mxCell id="mcp-arrow" value="extends" style="endArrow=classic;html=1;strokeWidth=1;strokeColor=#d79b00;dashed=1;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="550" y="475" as="sourcePoint" />
+            <mxPoint x="550" y="615" as="targetPoint" />
+          </mxGeometry>
         </mxCell>
         
         <!-- RAG Box -->
@@ -208,6 +236,9 @@
         </mxCell>
         <mxCell id="legend-api" value="□ API Endpoint" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#b85450" vertex="1" parent="1">
           <mxGeometry x="60" y="570" width="100" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-mcp" value="⬚ MCP (external)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#d79b00" vertex="1" parent="1">
+          <mxGeometry x="60" y="590" width="100" height="20" as="geometry" />
         </mxCell>
         
       </root>

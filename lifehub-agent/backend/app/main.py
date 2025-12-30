@@ -2,6 +2,7 @@
 
 import json
 import logging
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -10,17 +11,72 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage, AIMessage
 from pydantic import BaseModel
 
-from backend.agents.graph import get_multi_agent_graph
+from backend.agents.graph import get_multi_agent_graph, create_multi_agent_graph
+from backend.mcp.client import get_mcp_tools
+from backend.mcp.config import is_mcp_enabled
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+# Store MCP tools globally after initialization
+_mcp_tools: list = []
+_graphs_with_mcp: dict = {}
+
+
+def get_graph_with_mcp(provider: str = "openai"):
+    """Get or create a graph with MCP tools included.
+    
+    Args:
+        provider: Model provider to use ("openai" or "ollama")
+    """
+    global _graphs_with_mcp, _mcp_tools
+    
+    # Create a cache key
+    cache_key = f"{provider}_{len(_mcp_tools)}"
+    
+    if cache_key not in _graphs_with_mcp:
+        if _mcp_tools:
+            # Create graph with MCP tools
+            _graphs_with_mcp[cache_key] = create_multi_agent_graph(
+                provider=provider,
+                mcp_tools=_mcp_tools,
+            )
+        else:
+            # No MCP tools, use regular graph
+            _graphs_with_mcp[cache_key] = get_multi_agent_graph(provider=provider)
+    
+    return _graphs_with_mcp[cache_key]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan - initialize MCP tools on startup."""
+    global _mcp_tools
+    
+    if is_mcp_enabled():
+        logger.info("MCP is enabled, initializing MCP tools...")
+        try:
+            _mcp_tools = await get_mcp_tools()
+            logger.info(f"Loaded {len(_mcp_tools)} MCP tools: {[t.name for t in _mcp_tools]}")
+        except Exception as e:
+            logger.error(f"Failed to initialize MCP tools: {e}")
+            _mcp_tools = []
+    else:
+        logger.info("MCP is not enabled (no BRAVE_API_KEY set)")
+    
+    yield
+    
+    # Cleanup on shutdown
+    logger.info("Shutting down...")
+
+
 app = FastAPI(
     title="LifeHub Agent API",
     description="AI assistant with LangGraph orchestration",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Add CORS middleware for frontend
@@ -86,7 +142,7 @@ async def stream_response(
     lc_messages = convert_messages(messages)
     
     try:
-        agent_graph = get_multi_agent_graph(provider=provider)
+        agent_graph = get_graph_with_mcp(provider=provider)
     except Exception as e:
         logger.error(f"Failed to get agent graph: {e}")
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -197,7 +253,7 @@ async def chat_sync(request: ChatRequest):
     logger.info(f"Sync chat request: {len(request.messages)} messages, provider={request.provider}, debug={request.debug}")
     
     lc_messages = convert_messages(request.messages)
-    agent_graph = get_multi_agent_graph(provider=request.provider)
+    agent_graph = get_graph_with_mcp(provider=request.provider)
     
     # Run the graph to completion
     result = await agent_graph.ainvoke({

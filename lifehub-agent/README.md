@@ -308,7 +308,8 @@ See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
 | **Vector Store** | ChromaDB (embedded, file-based) |
 | **Embeddings** | OpenAI text-embedding-3-small or Ollama nomic-embed-text |
 | **Weather API** | Open-Meteo (free, no API key) |
-| **Backend** | FastAPI, Python 3.11, httpx |
+| **MCP Integration** | Model Context Protocol for external tools |
+| **Backend** | FastAPI, Python 3.11, httpx, mcp |
 | **Frontend** | Next.js, React, TypeScript, Tailwind CSS |
 | **Deployment** | Render (backend), Vercel (frontend) |
 
@@ -321,7 +322,34 @@ See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
 | `OPENAI_API_KEY` | Yes* | - | OpenAI API key (*not needed if using Ollama for everything) |
 | `EMBEDDING_PROVIDER` | No | `openai` | Embedding provider: `openai` or `ollama` |
 | `OLLAMA_BASE_URL` | No | `http://localhost:11434` | Ollama server URL |
+| `BRAVE_API_KEY` | No | - | Brave Search API key (enables web search via MCP) |
 | `NEXT_PUBLIC_BACKEND_URL` | No | `http://localhost:8000` | Backend URL for frontend |
+
+---
+
+## 🔌 MCP (Model Context Protocol)
+
+LifeHub supports [MCP](https://modelcontextprotocol.io/) for connecting to external tool servers.
+
+### Brave Search Integration
+
+Enable web search by setting the `BRAVE_API_KEY` environment variable:
+
+1. Get a free API key at [Brave Search API](https://brave.com/search/api/) (2,000 queries/month free)
+2. Set the environment variable:
+   ```bash
+   export BRAVE_API_KEY="your-api-key"
+   ```
+3. Restart the server - MCP tools will be loaded automatically
+
+**Available tools when enabled:**
+- `brave_web_search` - Search the web
+- `brave_local_search` - Search for local businesses
+- `brave_news_search` - Search news articles
+- `brave_image_search` - Search images
+- `brave_video_search` - Search videos
+
+**Example query:** "Search the web for the latest Python 3.13 features"
 
 ---
 
@@ -333,6 +361,8 @@ See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
 | `backend/agents/graph.py` | Multi-agent orchestration logic |
 | `backend/tools/notes.py` | RAG search implementation |
 | `backend/rag/store.py` | ChromaDB setup |
+| `backend/mcp/client.py` | MCP client for external tools |
+| `backend/mcp/config.py` | MCP server configuration |
 | `backend/app/main.py` | API endpoints + streaming |
 | `frontend/src/app/page.tsx` | Chat UI component |
 
