@@ -85,16 +85,18 @@ graph.add_edge("explainer", END)
 **In this project**:
 | Tool | Purpose | Implementation |
 |------|---------|----------------|
-| `get_weather` | Weather lookup | Returns mock weather data |
+| `get_weather` | Weather lookup | Open-Meteo API (free, no key needed) |
 | `add_task` | Task management | Writes to `tasks.json` |
 | `search_notes` | RAG search | Queries ChromaDB vector store |
 
 ```python
-# backend/tools/weather.py
+# backend/tools/weather.py - Uses Open-Meteo (free, no API key)
 @tool
 def get_weather(city: str) -> dict:
     """Get current weather for a city."""
-    return {"city": city, "temp": "72F", "conditions": "clear"}
+    coords = _get_coordinates(city)  # Geocoding API
+    response = httpx.get(WEATHER_URL, params={"latitude": lat, "longitude": lon, ...})
+    return {"city": city, "temp": "32°F", "conditions": "clear sky", ...}
 ```
 
 <div style="page-break-after: always;"></div>
@@ -119,9 +121,10 @@ def get_weather(city: str) -> dict:
 ```
 
 **Components**:
-- **Ingestion** (`backend/rag/ingest_notes.py`): Chunks markdown files, embeds with OpenAI, stores in ChromaDB
+- **Ingestion** (`backend/rag/ingest_notes.py`): Chunks markdown files, embeds with OpenAI or Ollama, stores in ChromaDB
 - **Retrieval** (`backend/tools/notes.py`): Embeds query, finds similar chunks
-- **Vector Store** (`backend/rag/store.py`): ChromaDB persistent storage
+- **Embeddings** (`backend/rag/embeddings.py`): Supports OpenAI or Ollama embedding models
+- **Vector Store** (`backend/rag/store.py`): ChromaDB persistent storage (embedded, no external DB needed)
 
 ```python
 # backend/tools/notes.py
@@ -179,6 +182,7 @@ lifehub-agent/
 │   │   └── notes.py             # search_notes RAG tool
 │   ├── rag/
 │   │   ├── store.py             # ChromaDB vector store setup
+│   │   ├── embeddings.py        # Embedding provider (OpenAI/Ollama)
 │   │   └── ingest_notes.py      # Notes ingestion script
 │   ├── notes/                   # Markdown notes for RAG
 │   │   ├── fitness_example.md
@@ -212,9 +216,9 @@ lifehub-agent/
 - Python 3.11+
 - Node.js 18+
 - [uv](https://github.com/astral-sh/uv) package manager
-- OpenAI API key
+- OpenAI API key (or Ollama for fully local setup)
 
-### Backend Setup
+### Backend Setup (OpenAI)
 
 ```bash
 cd lifehub-agent
@@ -230,6 +234,22 @@ uv run python -m backend.rag.ingest_notes
 
 # Start server
 uv run uvicorn backend.app.main:app --reload --port 8000
+```
+
+### Backend Setup (Fully Local with Ollama)
+
+```bash
+# Pull required models
+ollama pull llama3.2
+ollama pull nomic-embed-text
+
+# Use Ollama for embeddings (no OpenAI key needed)
+EMBEDDING_PROVIDER=ollama uv run python -m backend.rag.ingest_notes
+
+# Start server
+uv run uvicorn backend.app.main:app --reload --port 8000
+
+# Then select "Ollama" in the UI dropdown
 ```
 
 ### Frontend Setup
@@ -284,12 +304,24 @@ See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
 | Layer | Technology |
 |-------|------------|
 | **LLM Framework** | LangGraph, LangChain |
-| **LLM Providers** | OpenAI GPT-4o-mini, Ollama |
-| **Vector Store** | ChromaDB |
-| **Embeddings** | OpenAI text-embedding-3-small |
-| **Backend** | FastAPI, Python 3.11 |
-| **Frontend** | Next.js 16, React, TypeScript, Tailwind CSS |
+| **LLM Providers** | OpenAI GPT-4o-mini, Ollama (Llama 3.2) |
+| **Vector Store** | ChromaDB (embedded, file-based) |
+| **Embeddings** | OpenAI text-embedding-3-small or Ollama nomic-embed-text |
+| **Weather API** | Open-Meteo (free, no API key) |
+| **Backend** | FastAPI, Python 3.11, httpx |
+| **Frontend** | Next.js, React, TypeScript, Tailwind CSS |
 | **Deployment** | Render (backend), Vercel (frontend) |
+
+---
+
+## ⚙️ Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | Yes* | - | OpenAI API key (*not needed if using Ollama for everything) |
+| `EMBEDDING_PROVIDER` | No | `openai` | Embedding provider: `openai` or `ollama` |
+| `OLLAMA_BASE_URL` | No | `http://localhost:11434` | Ollama server URL |
+| `NEXT_PUBLIC_BACKEND_URL` | No | `http://localhost:8000` | Backend URL for frontend |
 
 ---
 
@@ -297,6 +329,7 @@ See [DEPLOY.md](./DEPLOY.md) for detailed deployment instructions.
 
 | File | Purpose |
 |------|---------|
+| `backend/rag/embeddings.py` | Embedding provider abstraction |
 | `backend/agents/graph.py` | Multi-agent orchestration logic |
 | `backend/tools/notes.py` | RAG search implementation |
 | `backend/rag/store.py` | ChromaDB setup |

@@ -2,13 +2,14 @@
 
 Usage:
     python -m backend.rag.ingest_notes
+    
+    # Use Ollama for embeddings (no OpenAI key needed):
+    EMBEDDING_PROVIDER=ollama python -m backend.rag.ingest_notes
 """
 
-import os
 from pathlib import Path
 
-from openai import OpenAI
-
+from backend.rag.embeddings import get_embeddings, get_embedding_provider
 from backend.rag.store import get_chroma_client, get_notes_collection
 
 # Notes directory
@@ -17,14 +18,6 @@ NOTES_DIR = Path(__file__).parent.parent / "notes"
 # Chunk settings
 CHUNK_SIZE = 500  # characters
 CHUNK_OVERLAP = 50  # characters
-
-
-def get_openai_client() -> OpenAI:
-    """Get OpenAI client for embeddings."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-    return OpenAI(api_key=api_key)
 
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -60,25 +53,6 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return chunks
 
 
-def get_embeddings(texts: list[str], client: OpenAI) -> list[list[float]]:
-    """Get embeddings for a list of texts using OpenAI API.
-    
-    Args:
-        texts: List of texts to embed.
-        client: OpenAI client.
-        
-    Returns:
-        List of embedding vectors.
-    """
-    if not texts:
-        return []
-    
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=texts,
-    )
-    
-    return [item.embedding for item in response.data]
 
 
 def scan_notes_directory() -> list[tuple[str, str]]:
@@ -113,7 +87,8 @@ def ingest_notes() -> None:
     
     # Initialize clients
     print("\n[1/5] Initializing clients...")
-    openai_client = get_openai_client()
+    provider = get_embedding_provider()
+    print(f"  Using embedding provider: {provider}")
     chroma_client = get_chroma_client()
     collection = get_notes_collection(chroma_client)
     
@@ -164,7 +139,7 @@ def ingest_notes() -> None:
     
     # Generate embeddings
     print("\n[5/5] Generating embeddings and storing...")
-    embeddings = get_embeddings(all_chunks, openai_client)
+    embeddings = get_embeddings(all_chunks)
     print(f"  Generated {len(embeddings)} embeddings")
     
     # Upsert into ChromaDB

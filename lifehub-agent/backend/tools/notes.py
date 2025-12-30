@@ -1,32 +1,9 @@
 """Notes search tool - searches personal notes using RAG."""
 
-import os
-
 from langchain_core.tools import tool
-from openai import OpenAI
 
+from backend.rag.embeddings import get_single_embedding
 from backend.rag.store import get_notes_collection
-
-
-def _get_query_embedding(query: str) -> list[float]:
-    """Get embedding for a query string.
-    
-    Args:
-        query: The search query.
-        
-    Returns:
-        Embedding vector.
-    """
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-    
-    client = OpenAI(api_key=api_key)
-    response = client.embeddings.create(
-        model="text-embedding-3-small",
-        input=query,
-    )
-    return response.data[0].embedding
 
 
 @tool
@@ -56,7 +33,7 @@ def search_notes(query: str, top_k: int = 5) -> list[dict]:
             }]
         
         # Get query embedding
-        query_embedding = _get_query_embedding(query)
+        query_embedding = get_single_embedding(query)
         
         # Search the collection
         results = collection.query(
