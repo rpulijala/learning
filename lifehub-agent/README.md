@@ -48,135 +48,20 @@ The Worker agent does **not** call the LLM - it directly invokes tools and colle
 
 <div style="page-break-after: always;"></div>
 
-## 🧠 AI Concepts Explained
+## 🧠 AI Concepts
 
-### 1. Large Language Models (LLMs)
+This project demonstrates several key AI/LLM concepts:
 
-**What**: Neural networks trained on vast text data to understand and generate human language.
+| Concept | Description |
+|---------|-------------|
+| **LLMs** | OpenAI GPT-4o-mini or Ollama (Llama 3.2) for local inference |
+| **Multi-Agent** | Planner → Worker → Explainer pipeline |
+| **RAG** | Vector search over personal notes using ChromaDB |
+| **Tool Calling** | Weather, tasks, notes search, web search (MCP) |
+| **Streaming** | Real-time token delivery via SSE |
+| **MCP** | Model Context Protocol for external tool integration |
 
-**In this project**:
-- **OpenAI GPT-4o-mini**: Cloud-hosted, high-quality responses
-- **Ollama (Llama 3.2)**: Local model for privacy/offline use
-
-```python
-# backend/models.py
-def get_model_client(provider: str = "openai"):
-    if provider == "ollama":
-        return ChatOpenAI(base_url="http://localhost:11434/v1", model="llama3.2")
-    return ChatOpenAI(model="gpt-4o-mini")
-```
-
-### 2. Multi-Agent Architecture
-
-**What**: Multiple specialized AI agents working together, each with a specific role.
-
-**In this project**:
-```
-┌──────────┐     ┌──────────┐     ┌───────────┐
-│ PLANNER  │ ──► │  WORKER  │ ──► │ EXPLAINER │
-│          │     │          │     │           │
-│ Creates  │     │ Executes │     │ Generates │
-│ plan     │     │ tools    │     │ response  │
-└──────────┘     └──────────┘     └───────────┘
-```
-
-- **Planner**: Analyzes request, outputs structured JSON plan
-- **Worker**: Executes plan steps, calls tools, logs results
-- **Explainer**: Synthesizes everything into user-friendly response
-
-```python
-# backend/agents/graph.py
-graph.add_edge(START, "planner")
-graph.add_edge("planner", "worker")
-graph.add_edge("worker", "explainer")
-graph.add_edge("explainer", END)
-```
-
-### 3. Tool Calling / Function Calling
-
-**What**: LLMs can invoke external functions to perform actions or retrieve data.
-
-**In this project**:
-| Tool | Purpose | Implementation |
-|------|---------|----------------|
-| `get_weather` | Weather lookup | Open-Meteo API (free, no key needed) |
-| `add_task` | Task management | Writes to `tasks.json` |
-| `search_notes` | RAG search | Queries ChromaDB vector store |
-
-```python
-# backend/tools/weather.py - Uses Open-Meteo (free, no API key)
-@tool
-def get_weather(city: str) -> dict:
-    """Get current weather for a city."""
-    coords = _get_coordinates(city)  # Geocoding API
-    response = httpx.get(WEATHER_URL, params={"latitude": lat, "longitude": lon, ...})
-    return {"city": city, "temp": "32°F", "conditions": "clear sky", ...}
-```
-
-<div style="page-break-after: always;"></div>
-
-### 4. RAG (Retrieval-Augmented Generation)
-
-**What**: Enhancing LLM responses with relevant information retrieved from a knowledge base.
-
-**In this project**:
-```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│ User Query  │ ──► │   Embed      │ ──► │  ChromaDB    │
-│ "running    │     │   Query      │     │  Similarity  │
-│  plan"      │     │  (OpenAI)    │     │   Search     │
-└─────────────┘     └──────────────┘     └──────────────┘
-                                                │
-                                                ▼
-                                         ┌──────────────┐
-                                         │ Top-K Chunks │
-                                         │ from notes   │
-                                         └──────────────┘
-```
-
-**Components**:
-- **Ingestion** (`backend/rag/ingest_notes.py`): Chunks markdown files, embeds with OpenAI or Ollama, stores in ChromaDB
-- **Retrieval** (`backend/tools/notes.py`): Embeds query, finds similar chunks
-- **Embeddings** (`backend/rag/embeddings.py`): Supports OpenAI or Ollama embedding models
-- **Vector Store** (`backend/rag/store.py`): ChromaDB persistent storage (embedded, no external DB needed)
-
-```python
-# backend/tools/notes.py
-@tool
-def search_notes(query: str) -> list[dict]:
-    """Search personal notes using semantic similarity."""
-    query_embedding = embed_text(query)
-    results = collection.query(query_embeddings=[query_embedding], n_results=5)
-    return format_results(results)
-```
-
-### 5. LangGraph State Machine
-
-**What**: A framework for building stateful, multi-step LLM applications as directed graphs.
-
-**In this project**:
-```python
-# State flows through the graph
-class MultiAgentState(TypedDict):
-    messages: list[AnyMessage]      # Conversation history
-    plan: list[PlanStep] | None     # Planner output
-    context_log: list[ContextLogEntry]  # Worker results
-    final_answer: str | None        # Explainer output
-```
-
-### 6. Streaming (Server-Sent Events)
-
-**What**: Real-time token-by-token delivery of LLM responses.
-
-**In this project**:
-```python
-# backend/app/main.py
-async def stream_response(messages, provider):
-    async for event in agent_graph.astream_events(input, version="v2"):
-        if event["event"] == "on_chat_model_stream":
-            token = event["data"]["chunk"].content
-            yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
-```
+> **📖 For detailed explanations with diagrams and code examples, see [AI Concepts Guide](docs/AI_CONCEPTS.md)**
 
 <div style="page-break-after: always;"></div>
 
