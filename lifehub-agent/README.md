@@ -34,6 +34,20 @@ LifeHub Agent is a full-stack AI application that showcases how to build product
 
 <div style="page-break-after: always;"></div>
 
+## 📊 Sequence Diagram
+
+Detailed sequence diagram showing all back-and-forth calls between entities during an end-to-end request lifecycle, including when data is sent to the LLM.
+
+![Sequence Diagram](docs/sequence-diagram.png)
+
+**Key insight**: LLM is called exactly **2 times** per request:
+1. **Planner** (non-streaming) → Creates JSON execution plan
+2. **Explainer** (streaming) → Generates final user response
+
+The Worker agent does **not** call the LLM - it directly invokes tools and collects results.
+
+<div style="page-break-after: always;"></div>
+
 ## 🧠 AI Concepts Explained
 
 ### 1. Large Language Models (LLMs)
