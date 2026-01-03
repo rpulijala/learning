@@ -225,6 +225,8 @@ lifehub-agent/
 
 ## 🚀 Quick Start
 
+> **📖 For detailed installation instructions (macOS & Windows), see the [Setup Guide](docs/SETUP_GUIDE.md)**
+
 ### Prerequisites
 
 - Python 3.11+
@@ -232,49 +234,36 @@ lifehub-agent/
 - [uv](https://github.com/astral-sh/uv) package manager
 - OpenAI API key (or Ollama for fully local setup)
 
-### Backend Setup (OpenAI)
+### Backend (Terminal 1)
 
 ```bash
 cd lifehub-agent
-
-# Install dependencies
-uv sync
-
-# Set API key
-export OPENAI_API_KEY="your-key"
-
-# Ingest notes into vector store
-uv run python -m backend.rag.ingest_notes
-
-# Start server
-uv run uvicorn backend.app.main:app --reload --port 8000
+uv sync                                           # Install dependencies
+export OPENAI_API_KEY="your-key"                  # Set API key (macOS/Linux)
+uv run python -m backend.rag.ingest_notes         # Ingest notes into vector store
+uv run uvicorn backend.app.main:app --reload --port 8000  # Start server
 ```
 
-### Backend Setup (Fully Local with Ollama)
+### Frontend (Terminal 2)
 
 ```bash
-# Pull required models
-ollama pull llama3.2
-ollama pull nomic-embed-text
-
-# Use Ollama for embeddings (no OpenAI key needed)
-EMBEDDING_PROVIDER=ollama uv run python -m backend.rag.ingest_notes
-
-# Start server
-uv run uvicorn backend.app.main:app --reload --port 8000
-
-# Then select "Ollama" in the UI dropdown
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
+cd lifehub-agent/frontend
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000
+### Open the App
+
+Go to **http://localhost:3000**
+
+### Fully Local with Ollama (No API Key)
+
+```bash
+ollama pull llama3.2 && ollama pull nomic-embed-text  # Pull models
+EMBEDDING_PROVIDER=ollama uv run python -m backend.rag.ingest_notes
+uv run uvicorn backend.app.main:app --reload --port 8000
+# Select "Ollama" in the UI dropdown
+```
 
 <div style="page-break-after: always;"></div>
 
